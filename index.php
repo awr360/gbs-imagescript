@@ -28,7 +28,7 @@ if (file_exists($manifestFile)) {
     $manifestData = json_decode(file_get_contents($manifestFile), true) ?: [];
 }
 
-// Helper to filter valid image extensions
+// Helper to check if a file is an image for preview purposes
 function isImage($filename) {
     $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
     return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
@@ -41,8 +41,6 @@ function getTopLevelFolders($dir) {
     foreach ($manifestData as $path) {
         $parts = explode('/', ltrim($path, '/'));
         if (count($parts) > 1) {
-            $folders[$parts[0]] = true;
-        } else if (count($parts) == 1 && !isImage($parts[0])) {
             $folders[$parts[0]] = true;
         }
     }
@@ -57,7 +55,7 @@ function getSubfoldersForFolder($baseDir, $folder) {
         $parts = explode('/', ltrim($path, '/'));
         if (count($parts) > 2 && $parts[0] === $folder) {
             $subfolderName = $parts[1];
-            if (!in_array(strtolower($subfolderName), $languageCodes) && !isImage($subfolderName)) {
+            if (!in_array(strtolower($subfolderName), $languageCodes)) {
                 $subfolders[$subfolderName] = true;
             }
         }
@@ -65,28 +63,28 @@ function getSubfoldersForFolder($baseDir, $folder) {
     return array_keys($subfolders);
 }
 
-// Function to get images for a specific folder path
-function getImagesInFolder($folderPath, $baseUrl) {
+// Function to get files for a specific folder path
+function getFilesInFolder($folderPath, $baseUrl) {
     global $manifestData, $baseDir;
-    $images = [];
+    $files = [];
     $targetPrefix = ltrim(substr($folderPath, strlen($baseDir)), '/');
     if ($targetPrefix !== '') $targetPrefix .= '/';
 
     foreach ($manifestData as $path) {
         if ($targetPrefix === '' || strpos($path, $targetPrefix) === 0) {
             $remainder = substr($path, strlen($targetPrefix));
-            if (strpos($remainder, '/') === false && isImage($remainder)) {
-                $images[] = $remainder;
+            if (strpos($remainder, '/') === false && $remainder !== '') {
+                $files[] = $remainder;
             }
         }
     }
-    return $images;
+    return $files;
 }
 
-// Function to get language-specific images for any folder path
-function getLangSpecificImages($basePath, $folderRelativePath) {
+// Function to get language-specific files for any folder path
+function getLangSpecificFiles($basePath, $folderRelativePath) {
     global $manifestData, $languageCodes;
-    $langImages = [];
+    $langFiles = [];
     $targetPrefix = ltrim($folderRelativePath, '/') . '/';
     
     foreach ($manifestData as $path) {
@@ -96,23 +94,30 @@ function getLangSpecificImages($basePath, $folderRelativePath) {
             if (count($parts) == 2) {
                 $lang = $parts[0];
                 $filename = $parts[1];
-                if (in_array(strtolower($lang), $languageCodes) && isImage($filename)) {
-                    $langImages[$lang][] = rtrim($folderRelativePath, '/') . '/' . $lang . '/' . $filename;
+                if (in_array(strtolower($lang), $languageCodes)) {
+                    $langFiles[$lang][] = rtrim($folderRelativePath, '/') . '/' . $lang . '/' . $filename;
                 }
             }
         }
     }
-    return $langImages;
+    return $langFiles;
 }
 
 // Get the top-level folders
 $topLevelFolders = getTopLevelFolders($baseDir);
 
+// Check for files in the root directory
+$rootFiles = getFilesInFolder($baseDir, $baseUrl);
+if (!empty($rootFiles)) {
+    // If there are root files, we can treat the root as a "virtual folder" or handle it specially
+    // For now, let's just make sure they can be displayed if we wanted to
+}
+
 // Output HTML
 ?>
 <html>
 <head>
-    <title>Image List</title>
+    <title>File Gallery</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -179,6 +184,29 @@ $topLevelFolders = getTopLevelFolders($baseDir);
         }
         .image-item a:hover {
             text-decoration: underline;
+        }
+        .file-preview {
+            width: 150px;
+            height: 150px;
+            background-color: #eee;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .file-ext {
+            font-size: 24px;
+            font-weight: bold;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .file-icon-img {
+            font-size: 48px;
+            margin-bottom: 5px;
         }
         .lang-note {
             font-size: 12px;
@@ -248,7 +276,7 @@ $topLevelFolders = getTopLevelFolders($baseDir);
     </style>
 </head>
 <body>
-    <h1>Global Bible School Image Gallery</h1>
+    <h1>Global Bible School File Gallery</h1>
 
     <?php if (empty($topLevelFolders)): ?>
         <p style="text-align: center; color: #666; margin-top: 50px;">
@@ -261,8 +289,8 @@ $topLevelFolders = getTopLevelFolders($baseDir);
         <?php
         $subfolders = getSubfoldersForFolder($baseDir, $folder);
         $folderPath = $baseDir . '/' . $folder;
-        $folderImages = getImagesInFolder($folderPath, $baseUrl);
-        $folderLangImages = getLangSpecificImages($baseDir, $folder);
+        $folderFiles = getFilesInFolder($folderPath, $baseUrl);
+        $folderLangFiles = getLangSpecificFiles($baseDir, $folder);
         ?>
 
         <div class="image-section">
@@ -271,32 +299,48 @@ $topLevelFolders = getTopLevelFolders($baseDir);
                 <span class="toggle-icon"></span>
             </div>
             <ul class="image-gallery">
-                <?php if (empty($folderImages) && empty($folderLangImages) && empty($subfolders)): ?>
-                    <li style="color: #999; padding: 10px;">No images or subfolders found in this section.</li>
+                <?php if (empty($folderFiles) && empty($folderLangFiles) && empty($subfolders)): ?>
+                    <li style="color: #999; padding: 10px;">No files or subfolders found in this section.</li>
                 <?php endif; ?>
-                <!-- Images directly in the main folder -->
-                <?php foreach ($folderImages as $image): ?>
+                <!-- Files directly in the main folder -->
+                <?php foreach ($folderFiles as $file): ?>
                     <?php
-                        $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $image;
+                        $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $file;
+                        $isImg = isImage($file);
                     ?>
                     <li class="image-item">
-                        <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
-                        <a href="<?php echo htmlspecialchars($url); ?>" title="<?php echo htmlspecialchars($image); ?>">
-                            <?php echo htmlspecialchars($image); ?>
+                        <?php if ($isImg): ?>
+                            <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($file); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
+                        <?php else: ?>
+                            <div class="file-preview" onclick="window.open('<?php echo htmlspecialchars($url); ?>', '_blank')">
+                                <span class="file-icon-img">📄</span>
+                                <span class="file-ext"><?php echo htmlspecialchars(pathinfo($file, PATHINFO_EXTENSION)); ?></span>
+                            </div>
+                        <?php endif; ?>
+                        <a href="<?php echo htmlspecialchars($url); ?>" title="<?php echo htmlspecialchars($file); ?>">
+                            <?php echo htmlspecialchars($file); ?>
                         </a>
                     </li>
                 <?php endforeach; ?>
 
                 <!-- Language variants directly in the main folder -->
-                <?php if (!empty($folderLangImages)): ?>
-                    <?php foreach ($folderLangImages as $lang => $langFiles): ?>
+                <?php if (!empty($folderLangFiles)): ?>
+                    <?php foreach ($folderLangFiles as $lang => $langFiles): ?>
                         <?php foreach ($langFiles as $file): ?>
                             <?php
                                 $templateUrl = rtrim($baseUrl, '/') . '/' . str_replace($lang, '_lang_', $file);
                                 $previewUrl = rtrim($baseUrl, '/') . '/' . $file;
+                                $isImg = isImage($file);
                             ?>
                             <li class="image-item">
-                                <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars(basename($file)); ?>" data-full-url="<?php echo htmlspecialchars($templateUrl); ?>">
+                                <?php if ($isImg): ?>
+                                    <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars(basename($file)); ?>" data-full-url="<?php echo htmlspecialchars($templateUrl); ?>">
+                                <?php else: ?>
+                                    <div class="file-preview" onclick="window.open('<?php echo htmlspecialchars($previewUrl); ?>', '_blank')">
+                                        <span class="file-icon-img">📄</span>
+                                        <span class="file-ext"><?php echo htmlspecialchars(pathinfo($file, PATHINFO_EXTENSION)); ?></span>
+                                    </div>
+                                <?php endif; ?>
                                 <a href="<?php echo htmlspecialchars($templateUrl); ?>" title="<?php echo htmlspecialchars(basename($file)); ?>">
                                     <?php echo htmlspecialchars(basename($file)); ?> (<?php echo htmlspecialchars($lang); ?>)
                                 </a>
@@ -309,8 +353,8 @@ $topLevelFolders = getTopLevelFolders($baseDir);
                 <?php foreach ($subfolders as $subfolder): ?>
                     <?php
                         $subfolderRelativePath = $folder . '/' . $subfolder;
-                        $subfolderLangImages = getLangSpecificImages($baseDir, $subfolderRelativePath);
-                        $hasSubfolderLang = !empty($subfolderLangImages);
+                        $subfolderLangFiles = getLangSpecificFiles($baseDir, $subfolderRelativePath);
+                        $hasSubfolderLang = !empty($subfolderLangFiles);
                     ?>
                     <li class="subfolder-section">
                         <div class="subfolder-heading collapsed" onclick="toggleSection(this)">
@@ -320,28 +364,44 @@ $topLevelFolders = getTopLevelFolders($baseDir);
                         <ul class="subfolder-gallery">
                             <?php
                                 $subfolderPath = $folderPath . '/' . $subfolder;
-                                $subfolderImages = getImagesInFolder($subfolderPath, $baseUrl);
-                                foreach ($subfolderImages as $image):
-                                    $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/' . $image;
+                                $subfolderFiles = getFilesInFolder($subfolderPath, $baseUrl);
+                                foreach ($subfolderFiles as $file):
+                                    $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/' . $file;
+                                    $isImg = isImage($file);
                             ?>
                                 <li class="image-item">
-                                    <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
-                                    <a href="<?php echo htmlspecialchars($url); ?>" title="<?php echo htmlspecialchars($image); ?>">
-                                        <?php echo htmlspecialchars($image); ?>
+                                    <?php if ($isImg): ?>
+                                        <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($file); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
+                                    <?php else: ?>
+                                        <div class="file-preview" onclick="window.open('<?php echo htmlspecialchars($url); ?>', '_blank')">
+                                            <span class="file-icon-img">📄</span>
+                                            <span class="file-ext"><?php echo htmlspecialchars(pathinfo($file, PATHINFO_EXTENSION)); ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <a href="<?php echo htmlspecialchars($url); ?>" title="<?php echo htmlspecialchars($file); ?>">
+                                        <?php echo htmlspecialchars($file); ?>
                                     </a>
                                 </li>
                             <?php endforeach; ?>
 
                             <!-- Language variants for this subfolder -->
                             <?php if ($hasSubfolderLang): ?>
-                                <?php foreach ($subfolderLangImages as $lang => $langFiles): ?>
+                                <?php foreach ($subfolderLangFiles as $lang => $langFiles): ?>
                                     <?php foreach ($langFiles as $file): ?>
                                         <?php
                                             $templateUrl = rtrim($baseUrl, '/') . '/' . str_replace($lang, '_lang_', $file);
                                             $previewUrl = rtrim($baseUrl, '/') . '/' . $file;
+                                            $isImg = isImage($file);
                                         ?>
                                         <li class="image-item">
-                                            <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars(basename($file)); ?>" data-full-url="<?php echo htmlspecialchars($templateUrl); ?>">
+                                            <?php if ($isImg): ?>
+                                                <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars(basename($file)); ?>" data-full-url="<?php echo htmlspecialchars($templateUrl); ?>">
+                                            <?php else: ?>
+                                                <div class="file-preview" onclick="window.open('<?php echo htmlspecialchars($previewUrl); ?>', '_blank')">
+                                                    <span class="file-icon-img">📄</span>
+                                                    <span class="file-ext"><?php echo htmlspecialchars(pathinfo($file, PATHINFO_EXTENSION)); ?></span>
+                                                </div>
+                                            <?php endif; ?>
                                             <a href="<?php echo htmlspecialchars($templateUrl); ?>" title="<?php echo htmlspecialchars(basename($file)); ?>">
                                                 <?php echo htmlspecialchars(basename($file)); ?> (<?php echo htmlspecialchars($lang); ?>)
                                             </a>

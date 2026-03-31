@@ -58,11 +58,10 @@ def sync_folder(folder_id, local_path, relative_path=""):
         if mime_type == 'application/vnd.google-apps.folder':
             active_paths.extend(sync_folder(item_id, target_path, rel_path))
         else:
-            # We only track non-folder files in the manifest
-            if name.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-                active_paths.append(rel_path)
-                if not os.path.exists(target_path):
-                    download_file(item_id, target_path)
+            # Track all non-folder files in the manifest
+            active_paths.append(rel_path)
+            if not os.path.exists(target_path):
+                download_file(item_id, target_path)
             
     return active_paths
 
