@@ -37,6 +37,18 @@ function getTopLevelFolders($dir) {
     return $folders;
 }
 
+function getAllowedExtensions() {
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+}
+
+function isPreviewableExtension($extension) {
+    return in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+}
+
+function getFileExtension($filename) {
+    return strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+}
+
 // Function to get subfolders for a specific top-level folder
 function getSubfoldersForFolder($baseDir, $folder) {
     $subfolders = [];
@@ -72,7 +84,7 @@ function getImagesInFolder($folderPath, $baseUrl) {
     
     $iterator = new DirectoryIterator($folderPath);
     foreach ($iterator as $item) {
-        if ($item->isFile() && in_array(strtolower($item->getExtension()), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+        if ($item->isFile() && in_array(strtolower($item->getExtension()), getAllowedExtensions(), true)) {
             $images[] = $item->getFilename();
         }
     }
@@ -98,7 +110,7 @@ function getLangSpecificImagesForSubfolder($baseDir, $folder, $subfolder) {
                 $langPath = $subfolderPath . '/' . $name;
                 $fileIter = new DirectoryIterator($langPath);
                 foreach ($fileIter as $file) {
-                    if ($file->isFile() && in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                    if ($file->isFile() && in_array(strtolower($file->getExtension()), getAllowedExtensions(), true)) {
                         $langImages[$name][] = $folder . '/' . $subfolder . '/' . $name . '/' . $file->getFilename();
                     }
                 }
@@ -145,7 +157,7 @@ function getImagesInLanguageFolder($folderPath) {
     
     $iterator = new DirectoryIterator($folderPath);
     foreach ($iterator as $item) {
-        if ($item->isFile() && in_array(strtolower($item->getExtension()), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+        if ($item->isFile() && in_array(strtolower($item->getExtension()), getAllowedExtensions(), true)) {
             $images[] = $item->getFilename();
         }
     }
@@ -301,6 +313,21 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
             border: 1px solid #ddd;
             cursor: pointer;
         }
+        .file-placeholder {
+            width: 150px;
+            height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background-color: #f8f9fa;
+            color: #333;
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
         .image-item a {
             display: block;
             margin-top: 8px;
@@ -402,12 +429,17 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
             </div>
             <ul class="image-gallery">
                 <!-- Images directly in the main folder -->
-                <?php foreach ($folderImages as $image): ?>
-                    <?php
-                        $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $image;
-                    ?>
+                <?php foreach ($folderImages as $image):
+                    $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $image;
+                    $extension = getFileExtension($image);
+                    $previewable = isPreviewableExtension($extension);
+                ?>
                     <li class="image-item">
-                        <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
+                        <?php if ($previewable): ?>
+                            <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
+                        <?php else: ?>
+                            <div class="file-placeholder"><?php echo strtoupper(htmlspecialchars($extension)); ?></div>
+                        <?php endif; ?>
                         <a href="<?php echo htmlspecialchars($url); ?>" title="<?php echo htmlspecialchars($image); ?>">
                             <?php echo htmlspecialchars($image); ?>
                         </a>
@@ -437,6 +469,7 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
                         </div>
                         <ul class="subfolder-gallery">
                             <?php foreach ($displayImages as $image => $source):
+                                $extension = getFileExtension($image);
                                 if ($source === 'root') {
                                     $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/' . $image;
                                     $linkUrl = $previewUrl;
@@ -446,9 +479,14 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
                                     $linkUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/_lang_/' . $image;
                                     $label = $image . ' (eng)';
                                 }
+                                $previewable = isPreviewableExtension($extension);
                             ?>
                                 <li class="image-item">
-                                    <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars($label); ?>" data-full-url="<?php echo htmlspecialchars($linkUrl); ?>">
+                                    <?php if ($previewable): ?>
+                                        <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars($label); ?>" data-full-url="<?php echo htmlspecialchars($linkUrl); ?>">
+                                    <?php else: ?>
+                                        <div class="file-placeholder"><?php echo strtoupper(htmlspecialchars($extension)); ?></div>
+                                    <?php endif; ?>
                                     <a href="<?php echo htmlspecialchars($linkUrl); ?>" title="<?php echo htmlspecialchars($label); ?>">
                                         <?php echo htmlspecialchars($label); ?>
                                     </a>
