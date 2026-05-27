@@ -1,0 +1,27 @@
+services:
+  gbs-imagescript:
+    image: gbs-imagescript:latest
+    build: .
+    restart: unless-stopped
+    environment:
+      - GDRIVE_FOLDER_ID=your_folder_id_here
+      - GDRIVE_API_KEY=your_api_key_here
+      - APP_BASE_URL=/images/
+    volumes:
+      - ./images:/var/www/html/images
+    networks:
+      - traefik-network
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        # Router: defines the public URL and forces HTTPS
+        - "traefik.http.routers.gbs-imagescript.rule=Host(`images.gbs.adventistinbox.org`)"
+        - "traefik.http.routers.gbs-imagescript.entrypoints=websecure"
+        - "traefik.http.routers.gbs-imagescript.tls.certresolver=myresolver"
+        # Service: forwards traffic to the internal Apache port (80)
+        - "traefik.http.services.gbs-imagescript.loadbalancer.server.port=80"
+
+networks:
+  traefik-network:
+    external: true

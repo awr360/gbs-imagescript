@@ -18,7 +18,7 @@ $languageCodes = [
 $baseDir = './images'; // Change this to the path of your images folder
 
 // Base URL for the images
-$baseUrl = 'https://connect.awr.org/imgmg/images/';
+$baseUrl = getenv('APP_BASE_URL') ?: '/images/';
 // $baseUrl = 'http://images.gbs.adventistinbox.org/';
 
 // Function to get top-level folders

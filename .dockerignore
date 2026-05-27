@@ -1,0 +1,7 @@
+.git
+.env
+.env.example
+*.md
+*.bak
+images/
+manifest.json
