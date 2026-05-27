@@ -38,7 +38,7 @@ function getTopLevelFolders($dir) {
 }
 
 function getAllowedExtensions() {
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'epub', 'zip'];
 }
 
 function isPreviewableExtension($extension) {
