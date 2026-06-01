@@ -6,29 +6,41 @@ import sys
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-API_KEY = os.environ.get('GDRIVE_API_KEY')
 FOLDER_ID = os.environ.get('GDRIVE_FOLDER_ID')
+CLIENT_ID = os.environ.get('GDRIVE_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('GDRIVE_CLIENT_SECRET')
+REFRESH_TOKEN = os.environ.get('GDRIVE_REFRESH_TOKEN')
 DEST_DIR = '/var/www/html/images'
 BASE_URL = 'https://www.googleapis.com/drive/v3/files'
 DOWNLOAD_WORKERS = 4
 
-if not API_KEY or not FOLDER_ID:
-    print("ERROR: GDRIVE_API_KEY and GDRIVE_FOLDER_ID must be set.")
+if not all([FOLDER_ID, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN]):
+    print("ERROR: GDRIVE_FOLDER_ID, GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET and GDRIVE_REFRESH_TOKEN must be set.")
     sys.exit(1)
 
-def list_files(parent_id):
+def get_access_token():
+    r = requests.post('https://oauth2.googleapis.com/token', data={
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'refresh_token': REFRESH_TOKEN,
+        'grant_type': 'refresh_token',
+    })
+    r.raise_for_status()
+    return r.json()['access_token']
+
+def list_files(parent_id, token):
     params = {
         'q': f"'{parent_id}' in parents and trashed = false",
-        'key': API_KEY,
         'fields': 'nextPageToken,files(id, name, mimeType)',
         'supportsAllDrives': 'true',
         'includeItemsFromAllDrives': 'true',
         'pageSize': 1000
     }
+    headers = {'Authorization': f'Bearer {token}'}
     files = []
     try:
         while True:
-            r = requests.get(BASE_URL, params=params)
+            r = requests.get(BASE_URL, params=params, headers=headers)
             r.raise_for_status()
             data = r.json()
             files.extend(data.get('files', []))
@@ -40,10 +52,10 @@ def list_files(parent_id):
         print(f"Error listing files in {parent_id}: {e}")
     return files
 
-def download_file(file_id, dest_path):
-    params = {'alt': 'media', 'key': API_KEY}
+def download_file(file_id, dest_path, token):
+    headers = {'Authorization': f'Bearer {token}'}
     try:
-        with requests.get(f"{BASE_URL}/{file_id}", params=params, stream=True) as r:
+        with requests.get(f"{BASE_URL}/{file_id}", params={'alt': 'media'}, headers=headers, stream=True) as r:
             r.raise_for_status()
             with open(dest_path, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=65536):
@@ -54,11 +66,9 @@ def download_file(file_id, dest_path):
         print(f"  Failed to download {dest_path}: {e}")
         return False
 
-def collect_files(folder_id, local_path, relative_path=""):
-    """Walk the Drive folder tree and return (rel_path, file_id, dest_path) for files to download
-    and rel_path for all active files."""
+def collect_files(folder_id, local_path, token, relative_path=""):
     Path(local_path).mkdir(parents=True, exist_ok=True)
-    items = list_files(folder_id)
+    items = list_files(folder_id, token)
     active_paths = []
     pending_downloads = []
 
@@ -70,7 +80,7 @@ def collect_files(folder_id, local_path, relative_path=""):
         rel_path = os.path.join(relative_path, name) if relative_path else name
 
         if mime_type == 'application/vnd.google-apps.folder':
-            sub_active, sub_pending = collect_files(item_id, target_path, rel_path)
+            sub_active, sub_pending = collect_files(item_id, target_path, token, rel_path)
             active_paths.extend(sub_active)
             pending_downloads.extend(sub_pending)
         else:
@@ -83,14 +93,16 @@ def collect_files(folder_id, local_path, relative_path=""):
 if __name__ == '__main__':
     print(f"Starting sync: Drive:{FOLDER_ID} -> {DEST_DIR}")
 
-    # 1. Walk Drive tree to discover all files and which ones need downloading
-    active_files, pending = collect_files(FOLDER_ID, DEST_DIR)
+    token = get_access_token()
+
+    # 1. Walk Drive tree
+    active_files, pending = collect_files(FOLDER_ID, DEST_DIR, token)
     print(f"Found {len(active_files)} files, {len(pending)} need downloading.")
 
     # 2. Download missing files in parallel
     if pending:
         with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool:
-            futures = {pool.submit(download_file, fid, path): path for fid, path in pending}
+            futures = {pool.submit(download_file, fid, path, token): path for fid, path in pending}
             for future in as_completed(futures):
                 future.result()
 
@@ -100,7 +112,7 @@ if __name__ == '__main__':
         json.dump(active_files, f)
     print(f"Manifest created with {len(active_files)} files.")
 
-    # 4. Prune local files that are no longer in Google Drive
+    # 4. Prune local files no longer in Google Drive
     valid_paths = set(active_files)
     valid_paths.add('manifest.json')
 
