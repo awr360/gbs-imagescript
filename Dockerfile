@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
     python3-requests \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite \
-    && mkdir -p /var/www/html/images && chown www-data:www-data /var/www/html/images
+    && mkdir -p /var/www/html/images && chown www-data:www-data /var/www/html/images \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Copy app files
 COPY index.php /var/www/html/index.php
