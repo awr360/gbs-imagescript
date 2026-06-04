@@ -32,7 +32,7 @@ else
 fi
 
 # Set up cron to sync every 5 minutes
-echo "*/5 * * * * root GDRIVE_API_KEY=\"${GDRIVE_API_KEY}\" GDRIVE_FOLDER_ID=\"${GDRIVE_FOLDER_ID}\" ${SYNC_CMD} > /proc/1/fd/1 2>&1" > /etc/cron.d/gdrive-sync
+echo "*/5 * * * * root GDRIVE_FOLDER_ID=\"${GDRIVE_FOLDER_ID}\" GDRIVE_CLIENT_ID=\"${GDRIVE_CLIENT_ID}\" GDRIVE_CLIENT_SECRET=\"${GDRIVE_CLIENT_SECRET}\" GDRIVE_REFRESH_TOKEN=\"${GDRIVE_REFRESH_TOKEN}\" ${SYNC_CMD} > /proc/1/fd/1 2>&1" > /etc/cron.d/gdrive-sync
 chmod 0644 /etc/cron.d/gdrive-sync
 
 # Start cron in background
