@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && a2enmod rewrite headers \
     && mkdir -p /var/www/html/images && chown www-data:www-data /var/www/html/images \
-    && echo "ServerName localhost" >> /etc/apache2/apache2.conf
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
+    && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # Copy app files
 COPY index.php /var/www/html/index.php
