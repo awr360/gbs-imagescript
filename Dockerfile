@@ -8,12 +8,15 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-requests \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
-    && a2enmod rewrite \
-    && mkdir -p /var/www/html/images && chown www-data:www-data /var/www/html/images
+    && a2enmod rewrite headers \
+    && mkdir -p /var/www/html/images && chown www-data:www-data /var/www/html/images \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Copy app files
 COPY index.php /var/www/html/index.php
 COPY .htaccess /var/www/html/.htaccess
+COPY cors.conf /etc/apache2/conf-available/cors.conf
+RUN a2enconf cors
 COPY sync.py /usr/local/bin/sync.py
 RUN chmod +x /usr/local/bin/sync.py
 
