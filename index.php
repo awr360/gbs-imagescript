@@ -166,8 +166,42 @@ function getImagesInLanguageFolder($folderPath) {
     return $images;
 }
 
+function getAvailableLanguages($baseDir, $topLevelFolders) {
+    $languages = [];
+
+    foreach ($topLevelFolders as $folder) {
+        $subfolders = getSubfoldersForFolder($baseDir, $folder);
+        foreach ($subfolders as $subfolder) {
+            $subfolderPath = $baseDir . '/' . $folder . '/' . $subfolder;
+            if (!is_dir($subfolderPath)) {
+                continue;
+            }
+
+            $iterator = new DirectoryIterator($subfolderPath);
+            foreach ($iterator as $item) {
+                if ($item->isDir() && !$item->isDot()) {
+                    $name = $item->getFilename();
+                    if (preg_match('/^[a-z]{3}$/i', $name)) {
+                        $languages[$name] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    $result = array_keys($languages);
+    sort($result);
+    return $result;
+}
+
 // Get current tab from query parameter
 $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
+$currentLanguage = isset($_GET['lang']) ? strtolower(trim($_GET['lang'])) : '';
+$availableLanguages = getAvailableLanguages($baseDir, $topLevelFolders);
+
+if ($currentLanguage !== '' && !in_array($currentLanguage, $availableLanguages, true)) {
+    $currentLanguage = '';
+}
 
 // Output HTML
 ?>
@@ -379,6 +413,33 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
             margin: 0;
             gap: 15px;
         }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .language-selector-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .language-selector-form label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .language-selector-form select {
+            padding: 6px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
         .toggle-icon::before {
             content: "▼";
         }
@@ -406,7 +467,21 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
     </style>
 </head>
 <body>
-    <h1>Global Bible School Image Gallery</h1>
+    <div class="page-header">
+        <h1>Global Bible School Image Gallery</h1>
+        <form method="get" class="language-selector-form">
+            <input type="hidden" name="tab" value="<?php echo htmlspecialchars($currentTab); ?>">
+            <label for="language-select">Language</label>
+            <select id="language-select" name="lang" onchange="this.form.submit()">
+                <option value="" <?php echo $currentLanguage === '' ? 'selected' : ''; ?>>Select language</option>
+                <?php foreach ($availableLanguages as $language): ?>
+                    <option value="<?php echo htmlspecialchars($language); ?>" <?php echo $currentLanguage === $language ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars(strtoupper($language)); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
 
     <div class="tabs">
         <a href="?tab=gallery" class="tab-button <?php echo $currentTab === 'gallery' ? 'active' : ''; ?>">Gallery View</a>
@@ -451,15 +526,19 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
                     <?php
                         $subfolderPath = $folderPath . '/' . $subfolder;
                         $rootImages = getImagesInFolder($subfolderPath, $baseUrl);
-                        $engImages = getImagesInFolder($subfolderPath . '/eng', $baseUrl);
                         $displayImages = [];
-                        foreach ($rootImages as $image) {
-                            $displayImages[$image] = 'root';
+                        $selectedLanguageImages = [];
+                        $hasSelectedLanguageImages = false;
+
+                        if ($currentLanguage !== '') {
+                            $selectedLanguageImages = getImagesInLanguageFolder($subfolderPath . '/' . $currentLanguage);
+                            $hasSelectedLanguageImages = !empty($selectedLanguageImages);
                         }
-                        foreach ($engImages as $image) {
-                            if (!isset($displayImages[$image])) {
-                                $displayImages[$image] = 'eng';
-                            }
+
+                        if ($currentLanguage !== '' && $hasSelectedLanguageImages) {
+                            $displayImages = $selectedLanguageImages;
+                        } else {
+                            $displayImages = $rootImages;
                         }
                     ?>
                     <li class="subfolder-section">
@@ -468,16 +547,19 @@ $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
                             <span class="toggle-icon"></span>
                         </div>
                         <ul class="subfolder-gallery">
-                            <?php foreach ($displayImages as $image => $source):
+                            <?php foreach ($displayImages as $image):
                                 $extension = getFileExtension($image);
-                                if ($source === 'root') {
-                                    $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/' . $image;
-                                    $linkUrl = $previewUrl;
-                                    $label = $image;
+                                $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/';
+                                $linkUrl = $previewUrl;
+                                $label = $image;
+
+                                if ($currentLanguage !== '' && $hasSelectedLanguageImages) {
+                                    $previewUrl .= $currentLanguage . '/' . $image;
+                                    $linkUrl .= $currentLanguage . '/' . $image;
+                                    $label = $image . ' (' . $currentLanguage . ')';
                                 } else {
-                                    $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/eng/' . $image;
-                                    $linkUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/_lang_/' . $image;
-                                    $label = $image . ' (eng)';
+                                    $previewUrl .= $image;
+                                    $linkUrl .= $image;
                                 }
                                 $previewable = isPreviewableExtension($extension);
                             ?>
