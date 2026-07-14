@@ -196,10 +196,14 @@ function getAvailableLanguages($baseDir, $topLevelFolders) {
 
 // Get current tab from query parameter
 $currentTab = isset($_GET['tab']) ? $_GET['tab'] : 'gallery';
-$currentLanguage = isset($_GET['lang']) ? strtolower(trim($_GET['lang'])) : '';
+$requestedLanguage = isset($_GET['lang']) ? strtolower(trim($_GET['lang'])) : '';
 $availableLanguages = getAvailableLanguages($baseDir, $topLevelFolders);
 
-if ($currentLanguage !== '' && !in_array($currentLanguage, $availableLanguages, true)) {
+if (in_array($requestedLanguage, $availableLanguages, true)) {
+    $currentLanguage = $requestedLanguage;
+} elseif (in_array('eng', $availableLanguages, true)) {
+    $currentLanguage = 'eng';
+} else {
     $currentLanguage = '';
 }
 
