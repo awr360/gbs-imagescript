@@ -3,3 +3,8 @@ Header set Access-Control-Allow-Origin "%{CORS_ORIGIN}e" env=CORS_ORIGIN
 
 RewriteEngine On
 RewriteRule ^(.*)/_lang_/(.*)$ $1/eng/$2 [L]
+
+# Serve root-path URLs from the images/ folder,
+RewriteCond %{REQUEST_URI} !^/images/
+RewriteCond %{DOCUMENT_ROOT}/images%{REQUEST_URI} -f
+RewriteRule ^(.*)$ images/$1 [L]

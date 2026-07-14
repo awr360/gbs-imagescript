@@ -1,0 +1,58 @@
+name: Build and Deploy to Prod k8s Cluster
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/awr360/gbs-imagescript
+  DEPLOY_SERVICE: gbs-imagescript
+  DEPLOY_REPO: awr360/k8s-ai-deployments
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set image tag
+        run: |
+          SHA="${GITHUB_SHA::7}"
+          IMAGE_TAG="main-sha-${SHA}"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger deployment
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          repository: ${{ env.DEPLOY_REPO }}
+          event-type: deploy
+          client-payload: >-
+            {
+              "service": "${{ env.DEPLOY_SERVICE }}",
+              "environment": "prod",
+              "image_tag": "${{ env.IMAGE_TAG }}",
+              "actor": "${{ github.actor }}",
+              "source_repo": "${{ github.repository }}@${{ github.sha }}"
+            }
