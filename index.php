@@ -534,16 +534,33 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
                         $selectedLanguageImages = [];
                         $hasSelectedLanguageImages = false;
 
+                        foreach ($rootImages as $image) {
+                            $displayImages[$image] = [
+                                'name' => $image,
+                                'label' => $image,
+                                'isLanguageImage' => false,
+                            ];
+                        }
+
                         if ($currentLanguage !== '') {
                             $selectedLanguageImages = getImagesInLanguageFolder($subfolderPath . '/' . $currentLanguage);
                             $hasSelectedLanguageImages = !empty($selectedLanguageImages);
+
+                            if ($hasSelectedLanguageImages) {
+                                foreach ($selectedLanguageImages as $image) {
+                                    $displayImages[$image] = [
+                                        'name' => $image,
+                                        'label' => $image . ' (' . $currentLanguage . ')',
+                                        'isLanguageImage' => true,
+                                    ];
+                                }
+                            }
                         }
 
-                        if ($currentLanguage !== '' && $hasSelectedLanguageImages) {
-                            $displayImages = $selectedLanguageImages;
-                        } else {
-                            $displayImages = $rootImages;
-                        }
+                        $displayImages = array_values($displayImages);
+                        usort($displayImages, function ($a, $b) {
+                            return strnatcasecmp($a['name'], $b['name']);
+                        });
                     ?>
                     <li class="subfolder-section">
                         <div class="subfolder-heading collapsed" onclick="toggleSection(this)">
@@ -551,16 +568,16 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
                             <span class="toggle-icon"></span>
                         </div>
                         <ul class="subfolder-gallery">
-                            <?php foreach ($displayImages as $image):
+                            <?php foreach ($displayImages as $imageData):
+                                $image = $imageData['name'];
                                 $extension = getFileExtension($image);
                                 $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/';
                                 $linkUrl = $previewUrl;
-                                $label = $image;
+                                $label = $imageData['label'];
 
-                                if ($currentLanguage !== '' && $hasSelectedLanguageImages) {
+                                if ($imageData['isLanguageImage']) {
                                     $previewUrl .= $currentLanguage . '/' . $image;
                                     $linkUrl .= $currentLanguage . '/' . $image;
-                                    $label = $image . ' (' . $currentLanguage . ')';
                                 } else {
                                     $previewUrl .= $image;
                                     $linkUrl .= $image;
