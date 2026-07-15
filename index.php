@@ -49,6 +49,22 @@ function getFileExtension($filename) {
     return strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 }
 
+function getAbsoluteImageUrl($baseUrl, $path) {
+    $normalizedBase = trim($baseUrl);
+    if ($normalizedBase === '') {
+        return '/' . ltrim($path, '/');
+    }
+
+    if (preg_match('#^https?://#i', $normalizedBase) || strpos($normalizedBase, '//') === 0) {
+        return rtrim($normalizedBase, '/') . '/' . ltrim($path, '/');
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
+    return $scheme . '://' . $host . '/' . ltrim(rtrim($normalizedBase, '/') . '/' . ltrim($path, '/'), '/');
+}
+
 // Function to get subfolders for a specific top-level folder
 function getSubfoldersForFolder($baseDir, $folder) {
     $subfolders = [];
@@ -509,13 +525,13 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
             <ul class="image-gallery">
                 <!-- Images directly in the main folder -->
                 <?php foreach ($folderImages as $image):
-                    $url = rtrim($baseUrl, '/') . '/' . $folder . '/' . $image;
+                    $url = getAbsoluteImageUrl($baseUrl, $folder . '/' . $image);
                     $extension = getFileExtension($image);
                     $previewable = isPreviewableExtension($extension);
                 ?>
                     <li class="image-item">
                         <?php if ($previewable): ?>
-                            <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-full-url="<?php echo htmlspecialchars($url); ?>">
+                            <img src="<?php echo htmlspecialchars($url); ?>" alt="<?php echo htmlspecialchars($image); ?>" data-copy-url="<?php echo htmlspecialchars($url); ?>">
                         <?php else: ?>
                             <div class="file-placeholder"><?php echo strtoupper(htmlspecialchars($extension)); ?></div>
                         <?php endif; ?>
@@ -571,22 +587,28 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
                             <?php foreach ($displayImages as $imageData):
                                 $image = $imageData['name'];
                                 $extension = getFileExtension($image);
-                                $previewUrl = rtrim($baseUrl, '/') . '/' . $folder . '/' . $subfolder . '/';
-                                $linkUrl = $previewUrl;
                                 $label = $imageData['label'];
 
-                                if ($imageData['isLanguageImage']) {
-                                    $previewUrl .= $currentLanguage . '/' . $image;
-                                    $linkUrl .= $currentLanguage . '/' . $image;
+                                $languagePath = '';
+                                if ($currentLanguage !== '') {
+                                    $languageFilePath = $baseDir . '/' . $folder . '/' . $subfolder . '/' . $currentLanguage . '/' . $image;
+                                    if (file_exists($languageFilePath) || $imageData['isLanguageImage']) {
+                                        $languagePath = $currentLanguage;
+                                    }
+                                }
+
+                                if ($languagePath !== '') {
+                                    $previewUrl = getAbsoluteImageUrl($baseUrl, $folder . '/' . $subfolder . '/' . $currentLanguage . '/' . $image);
+                                    $linkUrl = getAbsoluteImageUrl($baseUrl, $folder . '/' . $subfolder . '/_lang_/' . $image);
                                 } else {
-                                    $previewUrl .= $image;
-                                    $linkUrl .= $image;
+                                    $previewUrl = getAbsoluteImageUrl($baseUrl, $folder . '/' . $subfolder . '/' . $image);
+                                    $linkUrl = $previewUrl;
                                 }
                                 $previewable = isPreviewableExtension($extension);
                             ?>
                                 <li class="image-item">
                                     <?php if ($previewable): ?>
-                                        <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars($label); ?>" data-full-url="<?php echo htmlspecialchars($linkUrl); ?>">
+                                        <img src="<?php echo htmlspecialchars($previewUrl); ?>" alt="<?php echo htmlspecialchars($label); ?>" data-copy-url="<?php echo htmlspecialchars($linkUrl); ?>">
                                     <?php else: ?>
                                         <div class="file-placeholder"><?php echo strtoupper(htmlspecialchars($extension)); ?></div>
                                     <?php endif; ?>
@@ -668,8 +690,8 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
             let currentUrl = '';
             document.querySelectorAll('.image-item img').forEach(img => {
                 img.addEventListener('click', function() {
-                    currentUrl = this.dataset.fullUrl;
-                    lightboxImg.src = this.src;
+                    currentUrl = this.dataset.copyUrl || this.dataset.fullUrl || new URL(this.currentSrc || this.src, window.location.href).href;
+                    lightboxImg.src = this.currentSrc || this.src;
                     lightbox.style.display = 'flex';
                 });
             });
@@ -680,12 +702,12 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
             });
             lightboxImg.addEventListener('click', function() {
                 lightbox.style.display = 'none';
-                navigator.clipboard.writeText(currentUrl);
+                navigator.clipboard.writeText(currentUrl || lightboxImg.currentSrc || lightboxImg.src || window.location.href);
             });
             document.querySelectorAll('.image-item a').forEach(a => {
                 a.addEventListener('click', function(e) {
                     e.preventDefault();
-                    navigator.clipboard.writeText(this.href);
+                    navigator.clipboard.writeText(this.href || this.dataset.copyUrl || this.dataset.fullUrl || '');
                 });
             });
         });
