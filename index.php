@@ -232,19 +232,20 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f5f5;
-            padding: 20px;
+            padding: 12px 16px;
         }
         h1 {
             color: #333;
+            margin: 0;
         }
         .tabs {
             display: flex;
             gap: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
             border-bottom: 2px solid #ddd;
         }
         .tab-button {
-            padding: 12px 20px;
+            padding: 10px 16px;
             background-color: #e9ecef;
             border: none;
             cursor: pointer;
@@ -437,18 +438,18 @@ if (in_array($requestedLanguage, $availableLanguages, true)) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 20px;
+            gap: 16px;
             flex-wrap: wrap;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
         .language-selector-form {
             display: flex;
             align-items: center;
             gap: 8px;
             background-color: white;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
         .language-selector-form label {
             font-weight: bold;
