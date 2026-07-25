@@ -31,7 +31,7 @@ def get_access_token():
 def list_files(parent_id, token):
     params = {
         'q': f"'{parent_id}' in parents and trashed = false",
-        'fields': 'nextPageToken,files(id, name, mimeType)',
+        'fields': 'nextPageToken,files(id, name, mimeType, md5Checksum)',
         'supportsAllDrives': 'true',
         'includeItemsFromAllDrives': 'true',
         'pageSize': 1000
@@ -66,10 +66,10 @@ def download_file(file_id, dest_path, token):
         print(f"  Failed to download {dest_path}: {e}")
         return False
 
-def collect_files(folder_id, local_path, token, relative_path=""):
+def collect_files(folder_id, local_path, token, manifest, relative_path=""):
     Path(local_path).mkdir(parents=True, exist_ok=True)
     items = list_files(folder_id, token)
-    active_paths = []
+    active_hashes = {}
     pending_downloads = []
 
     for item in items:
@@ -80,40 +80,52 @@ def collect_files(folder_id, local_path, token, relative_path=""):
         rel_path = os.path.join(relative_path, name) if relative_path else name
 
         if mime_type == 'application/vnd.google-apps.folder':
-            sub_active, sub_pending = collect_files(item_id, target_path, token, rel_path)
-            active_paths.extend(sub_active)
+            sub_hashes, sub_pending = collect_files(item_id, target_path, token, manifest, rel_path)
+            active_hashes.update(sub_hashes)
             pending_downloads.extend(sub_pending)
         else:
-            active_paths.append(rel_path)
+            drive_md5 = item.get('md5Checksum')
+            active_hashes[rel_path] = drive_md5
             if not os.path.exists(target_path):
                 pending_downloads.append((item_id, target_path))
+            elif drive_md5 and manifest.get(rel_path) != drive_md5:
+                print(f"  Changed: {rel_path}")
+                pending_downloads.append((item_id, target_path))
 
-    return active_paths, pending_downloads
+    return active_hashes, pending_downloads
 
 if __name__ == '__main__':
     print(f"Starting sync: Drive:{FOLDER_ID} -> {DEST_DIR}")
 
     token = get_access_token()
 
-    # 1. Walk Drive tree
-    active_files, pending = collect_files(FOLDER_ID, DEST_DIR, token)
-    print(f"Found {len(active_files)} files, {len(pending)} need downloading.")
+    # 1. Load existing manifest
+    manifest_path = os.path.join(DEST_DIR, 'manifest.json')
+    old_manifest = {}
+    if os.path.exists(manifest_path):
+        with open(manifest_path) as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                old_manifest = data
 
-    # 2. Download missing files in parallel
+    # 2. Walk Drive tree
+    active_hashes, pending = collect_files(FOLDER_ID, DEST_DIR, token, old_manifest)
+    print(f"Found {len(active_hashes)} files, {len(pending)} need downloading.")
+
+    # 3. Download changed/new files in parallel
     if pending:
         with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool:
             futures = {pool.submit(download_file, fid, path, token): path for fid, path in pending}
             for future in as_completed(futures):
                 future.result()
 
-    # 3. Write the manifest
-    manifest_path = os.path.join(DEST_DIR, 'manifest.json')
+    # 4. Write the manifest
     with open(manifest_path, 'w') as f:
-        json.dump(active_files, f)
-    print(f"Manifest created with {len(active_files)} files.")
+        json.dump(active_hashes, f)
+    print(f"Manifest created with {len(active_hashes)} files.")
 
-    # 4. Prune local files no longer in Google Drive
-    valid_paths = set(active_files)
+    # 5. Prune local files no longer in Google Drive
+    valid_paths = set(active_hashes.keys())
     valid_paths.add('manifest.json')
 
     for root, dirs, files in os.walk(DEST_DIR, topdown=False):
