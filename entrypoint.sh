@@ -7,7 +7,27 @@ if [ -z "$GDRIVE_FOLDER_ID" ] || [ -z "$GDRIVE_CLIENT_ID" ] || [ -z "$GDRIVE_CLI
   exit 1
 fi
 
-SYNC_CMD="/usr/local/bin/sync.py"
+# Create wrapper scripts so cron and webhook can access env vars
+cat > /usr/local/bin/run-sync.sh << ENVEOF
+#!/bin/bash
+export GDRIVE_FOLDER_ID="${GDRIVE_FOLDER_ID}"
+export GDRIVE_CLIENT_ID="${GDRIVE_CLIENT_ID}"
+export GDRIVE_CLIENT_SECRET="${GDRIVE_CLIENT_SECRET}"
+export GDRIVE_REFRESH_TOKEN="${GDRIVE_REFRESH_TOKEN}"
+/usr/local/bin/sync.py
+ENVEOF
+chmod +x /usr/local/bin/run-sync.sh
+
+cat > /usr/local/bin/run-watch.sh << ENVEOF
+#!/bin/bash
+export GDRIVE_CLIENT_ID="${GDRIVE_CLIENT_ID}"
+export GDRIVE_CLIENT_SECRET="${GDRIVE_CLIENT_SECRET}"
+export GDRIVE_REFRESH_TOKEN="${GDRIVE_REFRESH_TOKEN}"
+export WEBHOOK_URL="${WEBHOOK_URL}"
+export WEBHOOK_TOKEN="${WEBHOOK_TOKEN}"
+/usr/local/bin/watch.py
+ENVEOF
+chmod +x /usr/local/bin/run-watch.sh
 
 # Preflight: verify API key and folder are accessible before syncing
 echo "[entrypoint] Checking Google Drive API access..."
@@ -31,8 +51,9 @@ else
   exit 1
 fi
 
-# Set up cron to sync every 5 minutes
-echo "*/5 * * * * root GDRIVE_FOLDER_ID=\"${GDRIVE_FOLDER_ID}\" GDRIVE_CLIENT_ID=\"${GDRIVE_CLIENT_ID}\" GDRIVE_CLIENT_SECRET=\"${GDRIVE_CLIENT_SECRET}\" GDRIVE_REFRESH_TOKEN=\"${GDRIVE_REFRESH_TOKEN}\" ${SYNC_CMD} > /proc/1/fd/1 2>&1" > /etc/cron.d/gdrive-sync
+# Set up cron: fallback sync every 5 minutes + channel renewal every 12 hours
+echo "*/5 * * * * root /usr/local/bin/run-sync.sh > /proc/1/fd/1 2>&1" > /etc/cron.d/gdrive-sync
+echo "0 */12 * * * root /usr/local/bin/run-watch.sh > /proc/1/fd/1 2>&1" >> /etc/cron.d/gdrive-sync
 chmod 0644 /etc/cron.d/gdrive-sync
 
 # Start cron in background
@@ -40,9 +61,19 @@ cron
 
 # Run initial sync in background so Apache starts immediately
 echo "[entrypoint] Running initial sync in background..."
-$SYNC_CMD > /proc/1/fd/1 2>&1 &
+/usr/local/bin/run-sync.sh > /proc/1/fd/1 2>&1 &
 
-echo "[entrypoint] Cron started. Sync runs every 5 minutes."
+# Set up webhook if configured
+if [ -n "$WEBHOOK_URL" ] && [ -n "$WEBHOOK_TOKEN" ]; then
+  echo "${WEBHOOK_TOKEN}" > /tmp/webhook-token
+  echo "[entrypoint] Registering Drive webhook..."
+  /usr/local/bin/run-watch.sh > /proc/1/fd/1 2>&1 &
+  echo "[entrypoint] Webhook configured: ${WEBHOOK_URL}"
+else
+  echo "[entrypoint] WEBHOOK_URL/WEBHOOK_TOKEN not set, running in poll-only mode."
+fi
+
+echo "[entrypoint] Cron started. Fallback sync runs every 5 minutes."
 
 # Start Apache in foreground
 exec apache2-foreground
