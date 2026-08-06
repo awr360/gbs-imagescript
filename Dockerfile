@@ -1,7 +1,7 @@
-FROM php:8.3-apache
+FROM php:8.3-apache@sha256:bcf7ac6941725b08123df2732065b8ede097ed0977ba2891b411654efb35cc23
 
 # Install cron, python3, requests, enable mod_rewrite
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     cron \
     curl \
     unzip \
