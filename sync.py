@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import fcntl
+import time
 import requests
 from pathlib import Path
 import sys
@@ -8,6 +9,8 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 LOCK_FILE = '/tmp/sync.lock'
+LAST_FULL_SYNC_FILE = os.path.join('/var/www/html/images', '.last_full_sync')
+FULL_SYNC_INTERVAL = 3600
 
 FOLDER_ID = os.environ.get('GDRIVE_FOLDER_ID')
 CLIENT_ID = os.environ.get('GDRIVE_CLIENT_ID')
@@ -157,8 +160,18 @@ if __name__ == '__main__':
 
     token = get_access_token()
 
+    # Force a full sync every FULL_SYNC_INTERVAL seconds to catch missed changes
+    force_full = False
+    if os.path.exists(LAST_FULL_SYNC_FILE):
+        last_full = os.path.getmtime(LAST_FULL_SYNC_FILE)
+        if time.time() - last_full >= FULL_SYNC_INTERVAL:
+            force_full = True
+            print("Forcing periodic full sync...")
+    else:
+        force_full = True
+
     # Quick check: skip full sync if no relevant changes detected
-    if os.path.exists(PAGE_TOKEN_FILE) and os.path.exists(KNOWN_IDS_FILE):
+    if not force_full and os.path.exists(PAGE_TOKEN_FILE) and os.path.exists(KNOWN_IDS_FILE):
         try:
             with open(PAGE_TOKEN_FILE) as f:
                 saved_page_token = f.read().strip()
@@ -217,6 +230,7 @@ if __name__ == '__main__':
     valid_paths.add('manifest.json')
     valid_paths.add('.page_token')
     valid_paths.add('.known_ids.json')
+    valid_paths.add('.last_full_sync')
 
     for root, dirs, files in os.walk(DEST_DIR, topdown=False):
         for name in files:
@@ -231,5 +245,9 @@ if __name__ == '__main__':
             if not os.listdir(full_path):
                 os.rmdir(full_path)
                 print(f"  Deleted empty directory: {name}")
+
+    # Record full sync timestamp
+    with open(LAST_FULL_SYNC_FILE, 'w') as f:
+        f.write(str(int(time.time())))
 
     print("Sync finished.")
