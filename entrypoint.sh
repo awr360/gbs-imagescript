@@ -7,7 +7,7 @@ if [ -z "$GDRIVE_FOLDER_ID" ] || [ -z "$GDRIVE_CLIENT_ID" ] || [ -z "$GDRIVE_CLI
   exit 1
 fi
 
-# Create wrapper scripts so cron and webhook can access env vars
+# Create wrapper scripts so cron and the worker can access env vars
 cat > /usr/local/bin/run-sync.sh << ENVEOF
 #!/bin/bash
 export GDRIVE_FOLDER_ID="${GDRIVE_FOLDER_ID}"
@@ -56,6 +56,10 @@ echo "*/5 * * * * root /usr/local/bin/run-sync.sh > /proc/1/fd/1 2>&1" > /etc/cr
 echo "0 */12 * * * root /usr/local/bin/run-watch.sh > /proc/1/fd/1 2>&1" >> /etc/cron.d/gdrive-sync
 chmod 0644 /etc/cron.d/gdrive-sync
 
+# PHP can enqueue requests; the root worker owns sync execution and files.
+export SYNC_QUEUE_DIR=/run/gdrive-sync
+install -d -o root -g www-data -m 0770 "$SYNC_QUEUE_DIR"
+
 # Start cron in background
 cron
 
@@ -66,6 +70,9 @@ echo "[entrypoint] Running initial sync in background..."
 # Set up webhook if configured
 if [ -n "$WEBHOOK_URL" ] && [ -n "$WEBHOOK_TOKEN" ]; then
   echo "${WEBHOOK_TOKEN}" > /tmp/webhook-token
+  chown root:www-data /tmp/webhook-token
+  chmod 0640 /tmp/webhook-token
+  python3 -u /usr/local/bin/sync-worker.py &
   echo "[entrypoint] Registering Drive webhook..."
   /usr/local/bin/run-watch.sh > /proc/1/fd/1 2>&1 &
   echo "[entrypoint] Webhook configured: ${WEBHOOK_URL}"

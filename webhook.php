@@ -8,7 +8,7 @@ if (!file_exists($tokenFile)) {
 $expectedToken = trim(file_get_contents($tokenFile));
 $receivedToken = $_SERVER['HTTP_X_GOOG_CHANNEL_TOKEN'] ?? '';
 
-if ($receivedToken !== $expectedToken) {
+if ($expectedToken === '' || !hash_equals($expectedToken, $receivedToken)) {
     http_response_code(403);
     exit;
 }
@@ -20,14 +20,13 @@ if ($state === 'sync') {
     exit;
 }
 
-// Rate limit: ignore if last sync was less than 30 seconds ago
-$lastFile = '/tmp/sync.last';
-if (file_exists($lastFile) && (time() - filemtime($lastFile)) < 30) {
-    http_response_code(200);
+// Coalesce notifications into one pending request. Only the worker runs sync.
+$queueDir = getenv('SYNC_QUEUE_DIR') ?: '/run/gdrive-sync';
+$request = @fopen($queueDir . '/pending', 'c');
+if ($request === false) {
+    error_log('Unable to queue Google Drive sync');
+    http_response_code(503);
     exit;
 }
-touch($lastFile);
-
-// Trigger sync in background (sync.py handles its own lock)
-exec('/usr/local/bin/run-sync.sh > /proc/1/fd/1 2>&1 &');
+fclose($request);
 http_response_code(200);

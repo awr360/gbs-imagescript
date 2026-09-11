@@ -151,7 +151,11 @@ def collect_files(folder_id, local_path, token, manifest, relative_path=""):
 if __name__ == '__main__':
     lock_fd = open(LOCK_FILE, 'w')
     try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Webhook requests wait for cron/startup sync instead of being discarded.
+        flags = fcntl.LOCK_EX
+        if os.environ.get('SYNC_WAIT_FOR_LOCK') != '1':
+            flags |= fcntl.LOCK_NB
+        fcntl.flock(lock_fd, flags)
     except BlockingIOError:
         print("Another sync is already running, skipping.")
         sys.exit(0)
