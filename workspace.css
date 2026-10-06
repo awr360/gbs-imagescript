@@ -77,7 +77,7 @@ tbody tr:hover {background: #f7f9fb;}
 .modal-content {background: #fff; border-radius: 4px; padding: 18px; width: min(850px,100%); max-height: 90vh; overflow: auto;}
 .modal-header {font-size: 16px; font-weight: 600; padding-right: 36px; margin-bottom: 16px; overflow-wrap: anywhere;}
 .modal-body {line-height: 1.6; overflow-wrap: anywhere;}
-.modal-body .field-row {margin: 12px 0;}
+.modal-body .field-row {font-size: 16px; margin: 12px 0;}
 .modal-body hr {border: 0; border-top: 1px solid var(--line);}
 .modal-body img {max-width: 100%; max-height: 320px; display: block; object-fit: contain; margin: 8px 0;}
 .modal-body pre {white-space: pre-wrap;}

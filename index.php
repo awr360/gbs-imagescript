@@ -236,7 +236,7 @@ $collectionNames = ['atn'=>'All Things New','gcbook'=>'Great Controversy Book','
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $currentTab === 'gallery' ? 'Asset library' : 'Asset status' ?> · Global Bible School</title>
-    <link rel="stylesheet" href="workspace.css?v=2">
+    <link rel="stylesheet" href="workspace.css?v=3">
     <script src="workspace.js?v=2" defer></script>
 </head>
 <body>
