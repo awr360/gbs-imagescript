@@ -21,11 +21,6 @@ function closeWorkspaceDialog(dialog) {
     document.body.style.overflow = '';
     dialogOpener?.focus();
 }
-function gbsShowDetails(title, content) {
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-body').innerHTML = content;
-    openWorkspaceDialog(document.getElementById('modal'));
-}
 function gbsCloseDetails() { closeWorkspaceDialog(document.getElementById('modal')); }
 function notifyWorkspace(message) {
     const toast = document.getElementById('workspace-toast');
