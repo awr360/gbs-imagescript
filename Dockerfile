@@ -1,7 +1,7 @@
 FROM php:8.3-apache
 
 # Install cron, python3, requests, enable mod_rewrite
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     cron \
     curl \
     unzip \
