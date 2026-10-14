@@ -19,8 +19,8 @@ function workspaceIcon(string $name): string {
 }
 
 function workspaceHeader(string $view, string $language, array $languages): void {
-    $translationBase = rtrim(getenv('GBS_TRANSLATE_URL') ?: 'https://translate.globalbibleschool.org', '/');
-    $assetsBase = rtrim(getenv('GBS_ASSETS_URL') ?: 'https://assets.globalbibleschool.org', '/');
+    $translationBase = rtrim(getenv('GBS_TRANSLATE_URL') ?: 'https://translate-gbs.adventistinbox.org', '/');
+    $assetsBase = rtrim(getenv('GBS_ASSETS_URL') ?: 'https://images-gbs.adventistinbox.org', '/');
     $isTranslation = in_array($view, ['lesson', 'translation'], true);
     $items = [
         'lesson' => ['Lessons', 'book', $isTranslation ? '' : $translationBase . '/'],
